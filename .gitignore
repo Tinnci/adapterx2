@@ -1,0 +1,18 @@
+# AdapterX2 .gitignore
+
+# 编译输出
+30-39_文档输出/32_PDF输出/*.pdf
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器临时文件
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# 日志文件
+*.log
