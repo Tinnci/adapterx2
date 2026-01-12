@@ -182,85 +182,215 @@ Rockchip 遵循 USB Type-C 标准定义的 *Debug Accessory Mode (DAM)*。
   caption: [Project-S 接口定义],
 ) <tab:project-s-interfaces>
 
-== 核心电路
+== 核心芯片规格
 
-=== MUIC 激活电路
+=== U2: XC6206P182MR (1.8V LDO 稳压器)
 
-```
-Pin B12 (手机端) ----[619kΩ ±1%]---- GND
-```
-
-作用：告诉手机"我是 UART 线，请切断 USB，开启串口"。
-
-=== 电平转换电路
-
-由于 Samsung 使用 1.8V 逻辑电平，需要使用电平转换芯片。
-
-推荐芯片：*TXS0108E* 或简单的 MOSFET 双向转换电路
+由于 S9 的 MUIC 机制不通过接口输出 1.8V，需要 XC6206 将 VBUS 的 5V 转换为 1.8V。
 
 #figure(
   table(
-    columns: (auto, auto, 1fr),
-    align: (center, center, left),
+    columns: (1fr, 1fr, 2fr),
+    align: (left, left, left),
     stroke: 0.5pt + gray,
-    inset: 8pt,
+    inset: 6pt,
     fill: (x, y) => if y == 0 { luma(240) } else { none },
     
-    [*侧*], [*电压*], [*连接*],
-    [LV (低压)], [1.8V], [手机端 D+/D-],
-    [HV (高压)], [3.3V], [USB 转 TTL 工具],
+    [*参数*], [*值*], [*说明*],
+    [型号], [XC6206P182MR], [Torex 低功耗 LDO],
+    [输出电压], [1.8V ±2%], [固定输出],
+    [最大输出电流], [200mA], [UART 仅需 µA 级],
+    [压差], [250mV \@ 100mA], [],
+    [静态电流], [1µA (typ)], [极低功耗],
+    [封装], [SOT-23-3], [3 引脚],
   ),
-  caption: [电平转换器配置],
+  caption: [XC6206 规格参数],
 )
 
-=== 电源电路
-
-需要从 VBUS (5V) 产生 1.8V 参考电压：
-
-推荐 LDO：*XC6206P182MR* (1.8V 输出)
-
-== 信号连接表
+*引脚定义 (SOT-23-3):*
 
 #figure(
   table(
-    columns: (1fr, 1fr, 1fr, 2fr),
+    columns: (auto, auto, auto, 1fr),
     align: (center, center, center, left),
     stroke: 0.5pt + gray,
     inset: 6pt,
     fill: (x, y) => if y == 0 { luma(240) } else { none },
     
-    [*手机端引脚*], [*电平转换*], [*调试端*], [*说明*],
-    [A6 (D+)], [LV_RX → HV_RX], [RX (TTL)], [手机发送，调试器接收],
-    [A7 (D-)], [LV_TX → HV_TX], [TX (TTL)], [调试器发送，手机接收],
-    [B12], [619kΩ 对 GND], [—], [MUIC 激活],
-    [GND (A1/A12/B1)], [直连], [GND], [共地],
-    [VBUS (A4/A9)], [LDO 输入], [—], [供电 & 生成 1.8V],
+    [*引脚号*], [*名称*], [*网络名*], [*连接*],
+    [1], [VSS], [`GND`], [公共地],
+    [2], [VOUT], [`VCC_1V8`], [输出 1.8V → TXS0108E.VCCA],
+    [3], [VIN], [`VBUS_5V`], [输入 5V ← USB-C VBUS],
   ),
-  caption: [Project-S 信号连接表],
-) <tab:project-s-signals>
+  caption: [XC6206 引脚定义],
+)
 
-== BOM 清单
+*外围电路要求:*
+
+- *C1 (输入电容)*: 1µF，连接 `VBUS_5V` ↔ `GND`，靠近 VIN 引脚
+- *C2 (输出电容)*: 1µF，连接 `VCC_1V8` ↔ `GND`，*必须*，用于相位补偿
+
+=== U1: TXS0108E (8 路双向电平转换器)
+
+该芯片将手机端的 1.8V UART 信号转换为调试器的 3.3V 信号。
 
 #figure(
   table(
-    columns: (auto, 1fr, auto, 1fr),
-    align: (center, left, center, left),
+    columns: (1fr, 1fr, 2fr),
+    align: (left, left, left),
     stroke: 0.5pt + gray,
     inset: 6pt,
     fill: (x, y) => if y == 0 { luma(240) } else { none },
     
-    [*编号*], [*描述*], [*数量*], [*封装/规格*],
-    [J1], [USB Type-C 公头], [1], [24P 全功能],
-    [J2], [USB Type-C 母座], [1], [24P 全功能],
-    [J3], [2.54mm 排针], [1], [1×4P],
-    [R1], [电阻 619kΩ], [1], [0603, ±1%],
-    [U1], [电平转换器 TXS0108E], [1], [TSSOP-20],
-    [U2], [LDO XC6206P182MR], [1], [SOT-23],
-    [C1, C2], [电容 1µF], [2], [0603],
-    [C3], [电容 100nF], [1], [0603],
+    [*参数*], [*值*], [*说明*],
+    [型号], [TXS0108E], [TI 双向电平转换器],
+    [通道数], [8 路], [本设计仅用 2 路],
+    [VCCA 范围], [1.2V ~ 3.6V], [低压侧],
+    [VCCB 范围], [1.65V ~ 5.5V], [高压侧],
+    [内部上拉], [约 40kΩ], [无需外加],
+    [封装], [TSSOP-20], [20 引脚],
   ),
-  caption: [Project-S BOM 清单],
+  caption: [TXS0108E 规格参数],
+)
+
+*引脚定义 (TSSOP-20):*
+
+#figure(
+  table(
+    columns: (auto, auto, auto, 1.5fr),
+    align: (center, center, center, left),
+    stroke: 0.5pt + gray,
+    inset: 5pt,
+    fill: (x, y) => if y == 0 { luma(240) } else { none },
+    
+    [*引脚*], [*名称*], [*网络名*], [*连接*],
+    [1], [VCCA], [`VCC_1V8`], [低压侧电源 1.8V ← XC6206],
+    [2], [A1], [`PHONE_RX`], [手机 RX ← USB-C A6 (D+)],
+    [3], [A2], [`PHONE_TX`], [手机 TX ← USB-C A7 (D-)],
+    [4-9], [A3-A8], [—], [NC (不连接)],
+    [10], [OE], [`OE_EN`], [使能引脚 ← 10kΩ 上拉至 VCC_1V8],
+    [11], [GND], [`GND`], [公共地],
+    [12-17], [B8-B3], [—], [NC (不连接)],
+    [18], [B2], [`TTL_TX`], [调试器 TX → 排针],
+    [19], [B1], [`TTL_RX`], [调试器 RX → 排针],
+    [20], [VCCB], [`VCC_3V3`], [高压侧电源 3.3V ← 调试器],
+  ),
+  caption: [TXS0108E 引脚定义],
+)
+
+*外围电路要求:*
+
+- *C3 (VCCA 去耦)*: 100nF，连接 `VCC_1V8` ↔ `GND`
+- *C4 (VCCB 去耦)*: 100nF，连接 `VCC_3V3` ↔ `GND`
+- *R2 (OE 上拉)*: 10kΩ，连接 `OE_EN` → `VCC_1V8`
+
+#warning-box[
+  *关键设计约束:*
+  - 必须满足 *VCCA ≤ VCCB* (1.8V < 3.3V ✓)
+  - OE 引脚 *绝对不能悬空*，否则输出状态不确定
+  - 内部已集成 40kΩ 上拉，UART 信号线 *不需要* 外加上拉电阻
+]
+
+== MUIC 激活电路
+
+```
+Pin B12 (手机端) ----[R1: 619kΩ ±1%]---- GND
+```
+
+作用：告诉手机"我是 UART 线，请切断 USB，开启串口"。
+
+#info-box[
+  *电阻精度要求:* R1 必须使用 *±1%* 精度的电阻。普通 ±5% 电阻可能导致 MUIC 无法识别。
+]
+
+== 完整网络命名表 (Netlist)
+
+=== 电源网络
+
+#figure(
+  table(
+    columns: (auto, auto, 2fr),
+    align: (left, center, left),
+    stroke: 0.5pt + gray,
+    inset: 6pt,
+    fill: (x, y) => if y == 0 { luma(240) } else { none },
+    
+    [*网络名*], [*电压*], [*连接节点*],
+    [`VBUS_5V`], [5V], [USB-C VBUS (A4/A9/B4/B9), U2.VIN, C1, J2 透传],
+    [`VCC_1V8`], [1.8V], [U2.VOUT, C2, U1.VCCA, C3, R2],
+    [`VCC_3V3`], [3.3V], [J3.VCC, U1.VCCB, C4],
+    [`GND`], [0V], [所有芯片 GND, 所有电容负极, USB-C GND, J3.GND],
+  ),
+  caption: [电源网络定义],
+)
+
+=== 信号网络
+
+#figure(
+  table(
+    columns: (auto, auto, auto, 1.5fr),
+    align: (left, center, center, left),
+    stroke: 0.5pt + gray,
+    inset: 6pt,
+    fill: (x, y) => if y == 0 { luma(240) } else { none },
+    
+    [*网络名*], [*电压域*], [*方向*], [*连接节点*],
+    [`PHONE_RX`], [1.8V], [手机 ← 调试器], [USB-C A6 (D+), U1.A1],
+    [`PHONE_TX`], [1.8V], [手机 → 调试器], [USB-C A7 (D-), U1.A2],
+    [`TTL_RX`], [3.3V], [调试器 ← 手机], [U1.B1, J3.RX],
+    [`TTL_TX`], [3.3V], [调试器 → 手机], [U1.B2, J3.TX],
+    [`OE_EN`], [1.8V], [—], [U1.OE, R2],
+    [`MUIC_JIG`], [—], [—], [USB-C B12, R1],
+  ),
+  caption: [信号网络定义],
+)
+
+== 完整 BOM 清单
+
+#figure(
+  table(
+    columns: (auto, 1.2fr, auto, 1fr, 1fr),
+    align: (center, left, center, left, left),
+    stroke: 0.5pt + gray,
+    inset: 5pt,
+    fill: (x, y) => if y == 0 { luma(240) } else { none },
+    
+    [*编号*], [*描述*], [*数量*], [*封装/规格*], [*网络*],
+    [J1], [USB Type-C 公头], [1], [24P 全功能], [多个],
+    [J2], [USB Type-C 母座], [1], [24P 全功能], [VBUS_5V, GND],
+    [J3], [2.54mm 排针], [1], [1×4P], [VCC_3V3, TTL_TX, TTL_RX, GND],
+    [U1], [TXS0108E], [1], [TSSOP-20], [多个],
+    [U2], [XC6206P182MR], [1], [SOT-23-3], [VBUS_5V, VCC_1V8, GND],
+    [R1], [619kΩ ±1%], [1], [0603], [MUIC_JIG, GND],
+    [R2], [10kΩ], [1], [0603], [OE_EN, VCC_1V8],
+    [C1], [1µF (输入)], [1], [0603 X5R], [VBUS_5V, GND],
+    [C2], [1µF (输出)], [1], [0603 X5R], [VCC_1V8, GND],
+    [C3], [100nF (VCCA)], [1], [0603], [VCC_1V8, GND],
+    [C4], [100nF (VCCB)], [1], [0603], [VCC_3V3, GND],
+  ),
+  caption: [Project-S 完整 BOM 清单],
 ) <tab:project-s-bom>
+
+== 安全检查清单
+
+#figure(
+  table(
+    columns: (auto, 2fr, 1fr),
+    align: (center, left, center),
+    stroke: 0.5pt + gray,
+    inset: 6pt,
+    fill: (x, y) => if y == 0 { luma(240) } else { none },
+    
+    [*序号*], [*检查项*], [*预期值*],
+    [1], [U2 输出电压 (VCC_1V8 网络)], [1.8V ±2%],
+    [2], [U1 OE 引脚电压 (OE_EN 网络)], [≈ 1.8V],
+    [3], [VCCA < VCCB 条件], [1.8V < 3.3V ✓],
+    [4], [所有 GND 连通 (万用表蜂鸣档)], [导通],
+    [5], [R1 阻值 (619kΩ ±1%)], [613kΩ ~ 625kΩ],
+    [6], [J3 排针 VCC 电压], [3.3V (非 5V!)],
+  ),
+  caption: [调试前安全检查清单],
+)
 
 #pagebreak()
 
